@@ -72,7 +72,13 @@ CREATE INDEX IF NOT EXISTS idx_history_user ON issue_history(user_id, issued_at 
 
 async def init():
     global pool
-    pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=5)
+    dsn = (os.getenv("DATABASE_URL") or os.getenv("DATABASE_PUBLIC_URL") or "").strip()
+    if not dsn or "@" not in dsn or "${{" in dsn:
+        raise RuntimeError(
+            "DATABASE_URL пуст или неверный (получено: %r). Задайте в Variables сервиса бота: "
+            "DATABASE_URL = ${{Postgres.DATABASE_URL}} (имя сервиса БД должно совпадать)." % dsn[:15]
+        )
+    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
     async with pool.acquire() as c:
         await c.execute(SCHEMA)
         for k, v in DEFAULTS.items():
